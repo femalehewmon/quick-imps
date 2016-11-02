@@ -24,17 +24,16 @@
 using namespace cv;
 using namespace std;
 
-vector<string> filesInFolder(string& dirpath)
-{
-	dirpath.append("/*");
-	glob_t glob_result;
-	glob( dirpath.c_str(), GLOB_TILDE, NULL, &glob_result );
-	vector<string> files;
-	for ( int i = 0; i < glob_result.gl_pathc; ++i ) {
-		files.push_back(string(glob_result.gl_pathv[i]));
-	}
-	globfree(&glob_result);
-	return files;
+vector<string> filesInFolder(string& dirpath) {
+    dirpath.append("/*");
+    glob_t glob_result;
+    glob( dirpath.c_str(), GLOB_TILDE, NULL, &glob_result );
+    vector<string> files;
+    for ( int i = 0; i < glob_result.gl_pathc; ++i ) {
+        files.push_back(string(glob_result.gl_pathv[i]));
+    }
+    globfree(&glob_result);
+    return files;
 }
 
 void mergeHistory(vector<Mat> history, Mat& dst) {
@@ -72,24 +71,24 @@ int main(int argc, char** argv)
     }
 
     string dirpath = argv[1];
-	vector<string> img_files = filesInFolder(dirpath);
-	if ( img_files.size() == 0 ) {
-			cout << "Data files in " << dirpath << " were not found!" <<  endl;
-			return -1;
-	}
+    vector<string> img_files = filesInFolder(dirpath);
+    if ( img_files.size() == 0 ) {
+        cout << "Data files in " << dirpath << " were not found!" <<  endl;
+        return -1;
+    }
 
-    int n = 1;                 // number of frames to stores
+    int n = 1;                  // number of frames to stores
     vector<Mat> history;        // stores the previous n frames
 
     Mat orig, background, buffer, output;
 
     // process all video frames
-	for ( int i = 0; i < img_files.size(); ++i ) {
-		orig = imread(img_files[i], CV_LOAD_IMAGE_COLOR);
-		if(!orig.data ) {
-			cout << "No image data" <<  endl;
-			return -1;
-		}
+    for ( int i = 0; i < img_files.size(); ++i ) {
+        orig = imread(img_files[i], CV_LOAD_IMAGE_COLOR);
+        if(!orig.data ) {
+            cout << "No image data" <<  endl;
+            return -1;
+        }
 
         if ( !background.empty() ) {
             subtract(background, orig, output);
@@ -116,8 +115,8 @@ int main(int argc, char** argv)
             background = Mat::zeros(orig.size(), orig.type());
             mergeHistory(history, background);
         }
-	}
+    }
 
-	waitKey(0);
+    waitKey(0);
     return 0;
 }
