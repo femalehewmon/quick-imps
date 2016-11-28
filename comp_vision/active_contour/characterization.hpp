@@ -27,6 +27,7 @@ Point centroid(vector<Point> object);
 int area(vector<Point> object);
 double circularity(vector<Point> object);
 double orientation(vector<Point> object);
+double curvature(Point l, Point m, Point n);
 vector<double> curvature(vector<Point> contour);
 
 #endif

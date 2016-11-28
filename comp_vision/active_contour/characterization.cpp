@@ -18,10 +18,8 @@ vector<Point> foreground(Mat& src, int obj_id) {
 void normalize(vector<double>& vec, double a, double b) {
     double minv, maxv;
     minMaxLoc(vec, &minv, &maxv);
-    for ( int i = 0; i < vec.size(); ++i ) {
-        double normalized = a + (((vec[i] - minv) * (b - a))  / (maxv - minv));
-        vec[i] = normalized;
-    }
+    transform(vec.begin(), vec.end(), vec.begin(),
+              [=](double d){return a + ((d - minv) * (b - a)  / (maxv - minv));});
 }
 
 int area(vector<Point> object) {
@@ -86,30 +84,34 @@ double orientation(vector<Point> object) {
     return theta;
 }
 
+double curvature(Point l, Point m, Point n) {
+    double dxi = (m.x - l.x);
+    double dxi1 = (n.x - m.x);
+    double dyi = (m.y - l.y);
+    double dyi1 = (n.y - m.y);
+    double dsi = sqrt(pow(dxi,2) + pow(dyi,2));
+    double dsi1 = sqrt(pow(dxi1,2) + pow(dyi1,2));
+    double ds = (dsi + dsi1) / 2.0;
+
+    double c = (1/ds) * sqrt(pow((dxi/dsi) - (dxi1/dsi1), 2) +
+                         pow((dyi/dsi) - (dyi1/dsi1), 2));
+    c = pow(c, 2);
+    return c;
+}
+
 vector<double> curvature(vector<Point> contour) {
-    vector<double> curvature;
+    vector<double> cs;
     // adjust contour to handle start and end positions
     contour.insert(contour.begin(), contour[contour.size() - 1]);
     contour.push_back(contour[1]);
     // assign contour calculation for all points in original contour
     int i;
     for ( i = 1; i < contour.size() - 1; ++i ) {
-        double dxi = (contour[i].x - contour[i-1].x);
-        double dxi1 = (contour[i+1].x - contour[i].x);
-        double dyi = (contour[i].y - contour[i-1].y);
-        double dyi1 = (contour[i+1].y - contour[i].y);
-        double dsi = sqrt(pow(dxi,2) + pow(dyi,2));
-        double dsi1 = sqrt(pow(dxi1,2) + pow(dyi1,2));
-        double ds = (dsi + dsi1) / 2.0;
-
-        double c = (1/ds) * sqrt(pow((dxi/dsi) - (dxi1/dsi1), 2) +
-                             pow((dyi/dsi) - (dyi1/dsi1), 2));
-        c = pow(c, 2);
-        curvature.push_back(c);
+        cs.push_back(curvature(contour[i-1], contour[i], contour[i+1]));
     }
 
-    normalize(curvature);
+    normalize(cs);
 
-    return curvature;
+    return cs;
 }
 

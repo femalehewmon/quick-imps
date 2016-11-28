@@ -23,6 +23,11 @@ using namespace std;
 vector<Point> loadPointsFromFile(string filename);
 void drawVector(Mat& dst, vector<Point> points);
 
+Point farthestPoint(Point p, vector<Point> ps);
+double distanceBetweenPoints(Point a, Point b);
+vector<double> distanceBetweenPoints(vector<Point> points);
+vector<double> distanceBetweenPoints(vector<Point> points, Point ref_point);
+
 enum NEIGHBOR {N4, N8};
 vector<Point> neighborhood(Point p, NEIGHBOR type, bool include_self=false);
 
