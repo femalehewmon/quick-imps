@@ -79,7 +79,7 @@ bool activeContour(Mat& src, vector<Point>& contour,
     int n = contour.size(); // total number of points
     int points_moved = 0;   // points moved this iteration
 
-    int moved_threshold = 1; // minimum number of points that must
+    int threshold_moved = 1; // minimum number of points that must
                              // update to continue iterating
 
     // continuity energy calculation helpers
@@ -93,7 +93,6 @@ bool activeContour(Mat& src, vector<Point>& contour,
     int mag = 0;
     int prev, curr, next = 0;
     vector<Point> neighbors;
-
     // for each point, determine if a location in its neighborhood
     // would minimize the active contour energies
     for (i = 0; i <= n; ++i) { // process first point twice
@@ -162,21 +161,21 @@ bool activeContour(Mat& src, vector<Point>& contour,
         cfeedback.push_back(
                 curvature(contour[prev], contour[i], contour[next]));
     }
-    double cfeedback_threshold = 0;
-    double magnitude_threshold = 100;
+    double threshold_cfeedback = 0;
+    double threshold_magnitude = 100;
     for (i = 0; i < n; ++i) {
         prev = (i-1) % n;
         next = (i+1) % n;
         mag = src.at<uchar>(contour[i].y, contour[i].x);
         if (cfeedback[i] > cfeedback[prev] && cfeedback[i] > cfeedback[next]
-                && cfeedback[i] > cfeedback_threshold
-                && mag > magnitude_threshold) {
+                && cfeedback[i] > threshold_cfeedback
+                && mag > threshold_magnitude) {
             beta[i] = 0;
         }
     }
 
     cout << "points moved: " << points_moved << " out of " << n << endl;
-    return (points_moved >= moved_threshold);
+    return (points_moved >= threshold_moved);
 }
 
 void drawActiveContour(Mat& dst, vector<Point> points) {
@@ -211,7 +210,7 @@ int main(int argc, char** argv)
     }
     vector<Point> contour = loadPointsFromFile(init_file);
     if ( contour.size() <= 0 ) {
-        cout << "Could not open file " << init_file << endl;
+        cout << "Could not read points from file " << init_file << endl;
         return -1;
     }
 
@@ -220,9 +219,9 @@ int main(int argc, char** argv)
     Canny(img, edges, 0, 100);
 
     // initialize weights for energy functions
-    vector<double> alpha(contour.size(), 1.0); // continuity weight
-    vector<double> beta(contour.size(), 1.0);  // curvature weight
-    vector<double> gamma(contour.size(), 1.0); // gradient weight
+    vector<double> alpha(contour.size(), 1.0); // continuity weights
+    vector<double> beta(contour.size(), 1.0);  // curvature weights
+    vector<double> gamma(contour.size(), 1.0); // gradient weights
 
     Mat vis = img.clone();
     drawActiveContour(vis, contour);
@@ -231,9 +230,8 @@ int main(int argc, char** argv)
     waitKey(0);
 
     // run active contour algorithm and visualized progress
-    //Mat vis;
     int it_count = 0;
-    while (it_count < 300 && activeContour(edges, contour, alpha, beta, gamma)) {
+    while (it_count < 150 && activeContour(edges, contour, alpha, beta, gamma)) {
         // increase iteration count
         ++it_count;
         cout << "ITERATION: " << it_count << endl;
