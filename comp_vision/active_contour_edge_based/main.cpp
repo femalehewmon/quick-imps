@@ -221,7 +221,7 @@ int main(int argc, char** argv)
     // initialize weights for energy functions
     vector<double> alpha(contour.size(), 1.0); // continuity weights
     vector<double> beta(contour.size(), 1.0);  // curvature weights
-    vector<double> gamma(contour.size(), 1.0); // gradient weights
+    vector<double> gamma(contour.size(), 2.0); // gradient weights
 
     Mat vis = img.clone();
     drawActiveContour(vis, contour);
@@ -231,7 +231,7 @@ int main(int argc, char** argv)
 
     // run active contour algorithm and visualized progress
     int it_count = 0;
-    while (it_count < 150 && activeContour(edges, contour, alpha, beta, gamma)) {
+    while (it_count < 300 && activeContour(edges, contour, alpha, beta, gamma)) {
         // increase iteration count
         ++it_count;
         cout << "ITERATION: " << it_count << endl;
