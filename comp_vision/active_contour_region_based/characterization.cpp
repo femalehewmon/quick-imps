@@ -1,33 +1,5 @@
 ﻿#include "characterization.hpp"
 
-vector<Point> foreground(Mat<float>& src, int obj_id) {
-    vector<Point> foreground;
-    int row, col;
-    for ( row = 0; row < src.rows; ++row ) {
-        for ( col = 0; col < src.cols; ++col ) {
-            if (src.at<float>(row, col) == obj_id) {
-                Point p = Point(col, row);
-                foreground.push_back(p);
-            }
-        }
-    }
-    return foreground;
-}
-
-vector<Point> foreground(Mat<uchar>& src, int obj_id) {
-    vector<Point> foreground;
-    int row, col;
-    for ( row = 0; row < src.rows; ++row ) {
-        for ( col = 0; col < src.cols; ++col ) {
-            if (src.at<uchar>(row, col) == obj_id) {
-                Point p = Point(col, row);
-                foreground.push_back(p);
-            }
-        }
-    }
-    return foreground;
-}
-
 /* Normalize values in vector between a and b. In-place. */
 void normalize(vector<double>& vec, double a, double b) {
     double minv, maxv;

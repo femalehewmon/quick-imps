@@ -20,9 +20,22 @@
 using namespace cv;
 using namespace std;
 
-// characterization
+template <typename T>
+vector<Point> foreground(Mat src, int obj_id) {
+    vector<Point> foreground;
+    int row, col;
+    for ( row = 0; row < src.rows; ++row ) {
+        for ( col = 0; col < src.cols; ++col ) {
+            if (src.at<T>(row, col) == obj_id) {
+                Point p = Point(col, row);
+                foreground.push_back(p);
+            }
+        }
+    }
+    return foreground;
+}
+
 void normalize(vector<double>& vec, double a=0.0, double b=1.0);
-vector<Point> foreground(Mat& src, int obj_id=255);
 Point centroid(vector<Point> object);
 int area(vector<Point> object);
 double circularity(vector<Point> object);
