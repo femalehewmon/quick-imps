@@ -46,13 +46,11 @@ void drawMessage(Mat& dst, String msg) {
 
 int main(int argc, char** argv)
 {
-    String img_file, init_file;
-    if (argc < 3) {
+    String img_file;
+    if (argc < 2) {
         img_file = "../data/image.png";
-        init_file = "../data/init.txt";
     } else {
         img_file = argv[1];
-        init_file = argv[2];
     }
 
     // load the input image
@@ -61,23 +59,18 @@ int main(int argc, char** argv)
         cout << "Could not open file " << img_file << endl;
         return -1;
     }
+    cout << img.size() << endl;
 
-    Mat init = imread(init_file, IMREAD_GRAYSCALE);
-    if ( !img.data ) {
-        cout << "Could not open file " << img_file << endl;
-        return -1;
-    }
-
-    // initialize phi to binary input initialization
+    // initialize phi to initialization function
     // phi > 0 : inside contour
     // phi < 0 : outside contour
     // phi = 0 : on contour
-    Mat phi = Mat::zeros(init.size(), CV_32F);
-    threshold(init, phi, 1, 1, THRESH_BINARY);
+    Mat phi = Mat::zeros(img.size(), CV_32F);
+    initializePhiCircle(phi, phi.cols, phi.rows);
 
     // initialize weights for energy functions
-    //Mat phi = Mat(img.size(), CV_32F);
-    //initializePhi(phi);     // initialize to checkerboard pattern
+    vector<Point> contour;
+    getContourFromPhi(phi, contour);
 
     // show initial visualization, prompt user to begin segmentation
     Mat vis = img.clone();
@@ -87,16 +80,19 @@ int main(int argc, char** argv)
     waitKey(0);
 
     // run active contour algorithm and visualize progress
-    int it_max = 500; // cut-off point if algorithm does not converge
+    int it_max = 100; // cut-off point if algorithm does not converge
     int it_count = 0;
     while (it_count < it_max && !activeContour(img, phi)) {
         // increase iteration count
         ++it_count;
         cout << "ITERATION: " << it_count << endl;
 
+        // get current contour from updated phi
+        getContourFromPhi(phi, contour);
+
         // visualize active contour iteration
         vis = img.clone();
-        drawActiveContour(vis, phi);
+        drawActiveContour(vis, contour);
         drawMessage(vis, "iteration: " + to_string(it_count));
         imshow("Output", vis);
         waitKey(30);

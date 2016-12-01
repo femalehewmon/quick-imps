@@ -20,5 +20,17 @@
 using namespace cv;
 using namespace std;
 
+void initializePhiCheckerboard(Mat& phi);
+void initializePhiCircle(Mat& phi, int width, int height);
+int areaInsideContour(Mat phi);
+
+enum RegionType {INSIDE, OUTSIDE};
+double regionAverage(Mat src, Mat phi, RegionType region);
+
+double diracDelta (double phi_n, double dt);
+double curveEnergy (Mat phi, Point p, double h, double mu);
+bool activeContour(Mat src, Mat& phi);
+void getContourFromPhi(Mat phi, vector<Point>& contour);
+
 
 #endif
