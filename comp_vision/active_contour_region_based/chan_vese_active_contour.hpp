@@ -22,7 +22,7 @@ using namespace std;
 
 void initializePhiCheckerboard(Mat& phi);
 void initializePhiCircle(Mat& phi, int width, int height);
-int areaInsideContour(Mat phi);
+double areaInsideContour(Mat phi);
 
 enum RegionType {INSIDE, OUTSIDE};
 double regionAverage(Mat src, Mat phi, RegionType region);

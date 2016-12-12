@@ -87,11 +87,12 @@ int main(int argc, char** argv)
     Mat vis = composite.clone();
     drawActiveContour(vis, phi);
     drawMessage(vis, "Waiting to start... press any key");
-    imshow("Output", vis(Rect(0, 0, vis.cols, vis.rows - 10)));
+    imwrite("start.png", vis);
+    imshow("Output", vis);
     waitKey(0);
 
     // run active contour algorithm and visualize progress
-    int it_max = 1000; // cut-off point if algorithm does not converge
+    int it_max = 200; // cut-off point if algorithm does not converge
     int it_count = 0;
     while (it_count < it_max && !activeContour(img, phi)) {
         // increase iteration count
@@ -102,9 +103,17 @@ int main(int argc, char** argv)
         vis = composite.clone();
         drawActiveContour(vis, phi);
         drawMessage(vis, "iteration: " + to_string(it_count));
-        imshow("Output", vis(Rect(0, 0, vis.cols, vis.rows - 10)));
+        if (it_count == 25) {
+            imwrite("mid1.png", vis);
+        } else if (it_count == 50) {
+            imwrite("mid2.png", vis);
+        } else if (it_count == 100) {
+            imwrite("mid3.png", vis);
+        }
+        imshow("Output", vis);
         waitKey(30);
     }
+    imwrite("end.png", vis);
     waitKey(0); // display final frame until key pressed
 }
 

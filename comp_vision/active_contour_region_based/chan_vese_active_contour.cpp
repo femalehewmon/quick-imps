@@ -19,25 +19,17 @@ void initializePhiCheckerboard(Mat& phi) {
 
 // assign circle pattern
 void initializePhiCircle(Mat& phi, int width, int height) {
-    int w = floor(width/2);
-    int h = floor(height/2);
+    int w = floor(width/2) - 50;
+    int h = floor(height/2) - 50;
     for ( int i = 0; i < phi.rows; ++i ) {
         for ( int j = 0; j < phi.cols; ++j ) {
-            phi.at<double>(i, j) = -sqrt(pow(j-w, 2) + pow(i-h, 2)) + min(w, h);
+            phi.at<double>(i, j) = -sqrt(pow(j-w-50, 2) + pow(i-h-50, 2)) + min(w, h);
         }
     }
 }
 
-int areaInsideContour(Mat phi) {
-    int area = 0;
-    for ( int row = 0; row < phi.rows; ++row ) {
-        for ( int col = 0; col < phi.cols; ++col ) {
-            if (phi.at<double>(row, col) >= 0) {
-                ++area;
-            }
-        }
-    }
-    return area;
+double areaInsideContour(Mat phi) {
+    return (double)foreground<double>(phi).size();
 }
 
 double regionAverage(Mat src, Mat phi, RegionType region) {
@@ -70,16 +62,14 @@ double diracDelta (double phi_n, double dt) {
 bool activeContour(Mat src, Mat& phi) {
 
     double mu = 1.0;        // length weight
-    double v = 0.0;         // area weight, usually 0 (?) (nu)
+    double v = 0.5;         // area weight, typically 0 (nu)
     double lambda1 = 1.0;   // c1 weight (average intensity inside contour)
     double lambda2 = 1.0;   // c2 weight (average intensity outside contour)
 
     int h  = 1.0;                       // space step, where (i*h, j*h) are
                                         // the pixel locations
-    double dt = 0.5;                    // artificial time step t >= 0
+    double dt = 0.25;                   // artificial time step t >= 0
     double threshold_tolerance = 0.01;  // stopping condition
-
-    Mat phi_updated = phi.clone();     // buffer to hold updated phi
 
     double area = areaInsideContour(phi);
     double c1 = regionAverage(src, phi, INSIDE);  // pixel avg inside contour
@@ -129,20 +119,18 @@ bool activeContour(Mat src, Mat& phi) {
                             phi.at<double>(p.y,p.x-1)*divl +
                             phi.at<double>(p.y+1,p.x)*divd +
                             phi.at<double>(p.y-1,p.x)*divu)
-                        - v - lambda1*dist1 + lambda2*dist2)) / div;
+                        - v*area - lambda1*dist1 + lambda2*dist2)) / div;
 
             phi_diff += abs(pcurr - total_energy);
             phi.at<double>(i, j) = total_energy;
         }
     }
-    phi_diff = phi_diff / (phi.rows * phi.cols);
 
-    // calculate total difference in old vs new phi (describes the contour)
-    //double phi_diff = sum(abs(phi_updated - phi))[0];
+    // normalize total difference in old vs new phi (describes the contour)
+    phi_diff = phi_diff / (phi.rows * phi.cols);
     cout << "difference: " << phi_diff << endl;
 
-    // optionally reinitialize phi
-    // phi = phi_updated;
+    // TODO: optionally reinitialize phi
 
     return (phi_diff < threshold_tolerance);
 }
