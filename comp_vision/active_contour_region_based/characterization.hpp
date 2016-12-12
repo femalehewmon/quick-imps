@@ -21,12 +21,13 @@ using namespace cv;
 using namespace std;
 
 template <typename T>
-vector<Point> foreground(Mat src, int obj_id) {
+vector<Point> foreground(Mat src, int obj_id=-1) {
     vector<Point> foreground;
     int row, col;
     for ( row = 0; row < src.rows; ++row ) {
         for ( col = 0; col < src.cols; ++col ) {
-            if (src.at<T>(row, col) == obj_id) {
+            if ((obj_id == -1 && src.at<T>(row, col) > 0) ||
+                    src.at<T>(row, col) == obj_id) {
                 Point p = Point(col, row);
                 foreground.push_back(p);
             }

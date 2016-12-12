@@ -30,7 +30,7 @@ double regionAverage(Mat src, Mat phi, RegionType region);
 double diracDelta (double phi_n, double dt);
 double curveEnergy (Mat phi, Point p, double h, double mu);
 bool activeContour(Mat src, Mat& phi);
-void getContourFromPhi(Mat phi, vector<Point>& contour);
+void getContourMaskFromPhi(Mat phi, Mat& contourMask);
 
 
 #endif

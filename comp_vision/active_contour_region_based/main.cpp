@@ -31,25 +31,23 @@ using namespace std;
 //
 
 void drawActiveContour(Mat& dst, Mat phi) {
-    int row, col;
-    for ( row = 0; row < phi.rows; ++row ) {
-        for ( col = 0; col < phi.cols; ++col ) {
-            if (abs(phi.at<double>(row, col)) == 0) {
-                circle(dst, Point(col, row), 5, Scalar(0), -1);
-            } else if (phi.at<double>(row, col) > 0 ) {
-                circle(dst, Point(col, row), 1, Scalar(100));
-            }
-        }
+    Mat contourMask;
+    getContourMaskFromPhi(phi, contourMask);
+
+	Mat edges;
+    vector<vector<Point> > contours;
+    vector<Vec4i> hierarchy;
+    Canny(contourMask, edges, 1, 100, 3);
+    findContours(edges, contours, hierarchy,
+                        CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
+    for( int i = 0; i< contours.size(); i++ ) {
+        drawContours(dst, contours, i, Scalar(0, 0, 255), 2, 8, hierarchy, 0);
     }
-    return;
     /*
-    if (points.size() <= 0) return;
-    circle(dst, points[0], 3, Scalar(0), -1);
-    for (int i = 1; i < points.size(); ++i) {
-        circle(dst, points[i], 3, Scalar(100));
-        //line(dst, points[i], points[i+1], Scalar(100), 2);
+    vector<Point> points = foreground<uchar>(contourMask);
+    for (auto point: points) {
+        circle(dst, point, 5, Scalar(255, 0, 0), -1);
     }
-    circle(dst, points[points.size() - 1], 10, Scalar(100));
     */
 }
 
@@ -61,8 +59,7 @@ int main(int argc, char** argv)
 {
     String img_file;
     if (argc < 2) {
-        img_file = "../data/test1.jpg";
-        //img_file = "../data/Snake-contour-example.jpg";
+        img_file = "../data/image.png";
     } else {
         img_file = argv[1];
     }
@@ -83,19 +80,18 @@ int main(int argc, char** argv)
     initializePhiCircle(phi, phi.cols, phi.rows);
     //initializePhiCheckerboard(phi);
 
-    // initialize weights for energy functions
-    vector<Point> contour;
-    getContourFromPhi(phi, contour);
+    Mat composite;
+    cvtColor(img.clone(), composite, CV_GRAY2BGR);
 
     // show initial visualization, prompt user to begin segmentation
-    Mat vis = img.clone();
+    Mat vis = composite.clone();
     drawActiveContour(vis, phi);
     drawMessage(vis, "Waiting to start... press any key");
-    imshow("Output", vis);
+    imshow("Output", vis(Rect(0, 0, vis.cols, vis.rows - 10)));
     waitKey(0);
 
     // run active contour algorithm and visualize progress
-    int it_max = 100; // cut-off point if algorithm does not converge
+    int it_max = 1000; // cut-off point if algorithm does not converge
     int it_count = 0;
     while (it_count < it_max && !activeContour(img, phi)) {
         // increase iteration count
@@ -103,10 +99,10 @@ int main(int argc, char** argv)
         cout << "ITERATION: " << it_count << endl;
 
         // visualize active contour iteration
-        vis = img.clone();
+        vis = composite.clone();
         drawActiveContour(vis, phi);
         drawMessage(vis, "iteration: " + to_string(it_count));
-        imshow("Output", vis);
+        imshow("Output", vis(Rect(0, 0, vis.cols, vis.rows - 10)));
         waitKey(30);
     }
     waitKey(0); // display final frame until key pressed
