@@ -50,9 +50,7 @@ double regionAverage(Mat src, Mat phi, RegionType region) {
 
 double diracDelta (double phi_n, double dt) {
     // d/dt of H(phi) = 1/2*(1 + (2/PI)*arctan(phi))
-    //return dt / M_PI*(1 + pow(phi_n, 2));
     return dt / (M_PI*(pow(dt, 2) + pow(phi_n, 2)));
-    //return (abs(phi_n - 0.0) < 0.1) ? 1.0 : 0.0;
 }
 
 //
