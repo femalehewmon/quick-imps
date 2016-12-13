@@ -20,6 +20,8 @@
 using namespace cv;
 using namespace std;
 
+const double EPS = 1e-8;
+
 void initializePhiCheckerboard(Mat& phi);
 void initializePhiCircle(Mat& phi, int width, int height);
 double areaInsideContour(Mat phi);

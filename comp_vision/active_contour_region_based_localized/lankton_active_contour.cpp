@@ -18,15 +18,62 @@ void initializePhiCircle(Mat& phi, int width, int height) {
     }
 }
 
-double areaInsideContour(Mat phi) {
-    return (double)foreground<double>(phi).size();
+double regionAverage(Mat src, Mat phi, vector<Point> b, RegionType region) {
+    assert (src.size() == phi.size());
+    double total_intensity = 0.0;
+    int area = 0;
+    for (auto point : B) {
+        if (region == INSIDE) {
+            total_intensity += heaviside(point) * src.at<uchar>(y.y, y.x);
+            insideCount += heaviside(y, phi_n);
+        } ||
+            (region == OUTSIDE && phi.at<double>(point.y, poitn.x) < 0)) {
+            ++area;
+            total_intensity += src.at<uchar>(row, col);
+        }
+    }
+    return total_intensity / (double) area;
+}
+
+double heaviside (double phi_n) {
+    double h;
+    if (phi_n < -EPS) {
+        h = 1.0;
+    } else if (phi_n > EPS) {
+        h = 0.0;
+    } else {
+        h = (1.0/2.0) * (1 + (phi_n/EPS) + (1/M_PI)*sin(M_PI*phi_n/EPS));
+    }
+    return h;
+}
+
+double diracDelta (double phi_n, double dt) {
+    double d;
+    if (phi_n = 0) {
+        d = 1.0;
+    } else if (abs(phi_n) < EPS) {
+        d = 0.0;
+    } else {
+        d = (1.0/2.0*EPS)*(1 + cos(M_PI*phi_n/EPS));
+    }
+    return d;
 }
 
 
-
-double diracDelta (double phi_n, double dt) {
-    // d/dt of H(phi) = 1/2*(1 + (2/PI)*arctan(phi))
-    return dt / (M_PI*(pow(dt, 2) + pow(phi_n, 2)));
+vector<Point> localSurroundingRegion(Mat image, Point p, int radius) {
+    vector<Point> localPoints;
+    Point point;
+    // scan square quadrant region, save points within circle radius bounds
+    for (int i = p.y - radius; i <= p.y; i++) {
+        for (int j = p.x - radius; j <= p.x; ++j) {
+            point = Point(i, j);           // prospective point
+            if (inBounds(image, point) &&
+                    distanceBetweenPoints(p, point) <= radius) {
+                localPoints.push_back(point);
+            }
+        }
+    }
+    return localPoints;
 }
 
 //
@@ -40,11 +87,6 @@ bool activeContour(Mat src, Mat& phi) {
 
     double dt = 0.25;                   // artificial time step t >= 0
     double threshold_tolerance = 0.01;  // stopping condition
-
-    double area = areaInsideContour(phi);
-    double c1 = regionAverage(src, phi, INSIDE);  // pixel avg inside contour
-    double c2 = regionAverage(src, phi, OUTSIDE); // pixel avg outside contour
-    cout << "c1: " << c1 << " c2: " << c2 << endl;
 
     int u0 = 0;
     double phi_n, phi_n_plus_1 = 0.0;
@@ -63,20 +105,26 @@ bool activeContour(Mat src, Mat& phi) {
             pointX = Point(x_j, x_i);                // current point
             delta = diracDelta(phi_n, dt);           // dirac delta
 
+            // avoid doing unnecessary work, only consider border points
             if ( delta > 0 ) {
-                local_px_i0 = max(0, x_i - radius);
-                local_px_in = min(phi.rows, x_i + radius);
-                local_px_j0 = max(0, x_j - radius);
-                local_px_jn = min(phi.cols, x_j + radius);
-                // calculate energy within local region surrounding contour point
-                // traverse square only to minimize process time
-                for (y_i = local_px_i0; y_i < local_px_in; ++y_i) {
-                    for (y_j = local_px_j0; y_j < local_px_jn; ++y_j) {
-                        pointY = Point(y_j, y_i);           // prospective point
-                        B = withinLocalRegion(pointX, pointY, radius);
+                vector<Point> B = localSurroundingRegion(src, pointX, radius);
+                // calculate contour energy
+                ux = 0.0;
+                uy = 0.0;
+                insideCount = 0;
+                outsideCount = 0;
+                for (auto y : B) {
+                    ux += heaviside(y) * src.at<uchar>(y.y, y.x);
+                    insideCount += heaviside(y, phi_n);
 
-                    }
+                    vx += (1.0 - heaviside(y)) * src.at<uchar>(y.y, y.x);
+                    outsideCount += (1.0 - heaviside(y, phi_n));
                 }
+                ux = ux / insideCount;  // normalize by length to make average
+                vx = vx / outsideCount;
+
+
+                // penalize energy based on arc length
             }
             u0 = src.at<uchar>(i, j);           // current point intensity
             phi_n = phi.at<double>(i, j);        // current phi value
