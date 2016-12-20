@@ -1,5 +1,6 @@
+#include "utils.hpp"
 #include "characterization.hpp"
-#include "chan_vese_active_contour.hpp"
+#include "lankton_active_contour.hpp"
 
 // 2008 localized active contour implementation
 //
@@ -18,45 +19,19 @@ void initializePhiCircle(Mat& phi, int width, int height) {
     }
 }
 
-double regionAverage(Mat src, Mat phi, vector<Point> b, RegionType region) {
-    assert (src.size() == phi.size());
+double localRegionAverage(
+        Mat src, Mat phi, vector<Point> local_points,RegionType region) {
+    assert (local_points.size() > 0);
     double total_intensity = 0.0;
     int area = 0;
-    for (auto point : B) {
-        if (region == INSIDE) {
-            total_intensity += heaviside(point) * src.at<uchar>(y.y, y.x);
-            insideCount += heaviside(y, phi_n);
-        } ||
-            (region == OUTSIDE && phi.at<double>(point.y, poitn.x) < 0)) {
+    for (auto point: local_points) {
+        if ((region == INSIDE && phi.at<double>(point) >= 0) ||
+            (region == OUTSIDE && phi.at<double>(point) < 0)) {
             ++area;
-            total_intensity += src.at<uchar>(row, col);
+            total_intensity += src.at<uchar>(point);
         }
     }
-    return total_intensity / (double) area;
-}
-
-double heaviside (double phi_n) {
-    double h;
-    if (phi_n < -EPS) {
-        h = 1.0;
-    } else if (phi_n > EPS) {
-        h = 0.0;
-    } else {
-        h = (1.0/2.0) * (1 + (phi_n/EPS) + (1/M_PI)*sin(M_PI*phi_n/EPS));
-    }
-    return h;
-}
-
-double diracDelta (double phi_n, double dt) {
-    double d;
-    if (phi_n = 0) {
-        d = 1.0;
-    } else if (abs(phi_n) < EPS) {
-        d = 0.0;
-    } else {
-        d = (1.0/2.0*EPS)*(1 + cos(M_PI*phi_n/EPS));
-    }
-    return d;
+    return area > 0 ? total_intensity / area : 0.0;
 }
 
 
@@ -66,7 +41,7 @@ vector<Point> localSurroundingRegion(Mat image, Point p, int radius) {
     // scan square quadrant region, save points within circle radius bounds
     for (int i = p.y - radius; i <= p.y; i++) {
         for (int j = p.x - radius; j <= p.x; ++j) {
-            point = Point(i, j);           // prospective point
+            point = Point(j, i);           // prospective point
             if (inBounds(image, point) &&
                     distanceBetweenPoints(p, point) <= radius) {
                 localPoints.push_back(point);
@@ -76,99 +51,160 @@ vector<Point> localSurroundingRegion(Mat image, Point p, int radius) {
     return localPoints;
 }
 
+/*
+vector<Point> getBorderPoints(Mat phi) {
+    vector<Point> border_points;
+    for(int i = 0; i < phi.rows; ++i) {
+        for(int j = 0; j < phi.cols; ++j) {
+            if (phi.at<double>(i, j) >= -1.2 &&
+                    phi.at<double>(i, j) <= 1.2) {
+                border_points.push_back(Point(j, i));
+            }
+        }
+    }
+    Mat mask = Mat::zeros(phi.size(), phi.type());
+    for (auto p : border_points) {
+        circle(mask, p, 2, Scalar(255,0,0), 1);
+    }
+    imshow("tmp", mask);
+    waitKey(0);
+    return border_points;
+}
+*/
+vector<Point> getBorderPoints(Mat phi) {
+    Mat mask;
+    getContourMaskFromPhi(phi, mask);
+
+	Mat edges;
+    vector<vector<Point> > contours;
+    vector<Vec4i> hierarchy;
+    Canny(mask, edges, 1, 100, 3);
+    findContours(edges, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
+
+    vector<Point> border_points;
+    for( int i = 0; i < contours.size(); i++ ) {
+        border_points.insert(
+                border_points.end(), contours[i].begin(), contours[i].end());
+    }
+
+    /*
+    mask = Mat::zeros(mask.size(), mask.type());
+    for (auto p : border_points) {
+        circle(mask, p, 2, Scalar(255,0,0), -1);
+    }
+    imshow("tmp", mask);
+    waitKey(0);
+    */
+
+    return border_points;
+}
+
+double getCurvature(Mat phi, Point p, double eps) {
+    Point above = Point(p.x, p.y+1);
+    Point below = Point(p.x, p.y-1);
+    Point left  = Point(p.x-1, p.y);
+    Point right = Point(p.x+1, p.y);
+    Point above_left  = Point(p.x-1, p.y+1);
+    Point below_left  = Point(p.x-1, p.y-1);
+    Point above_right = Point(p.x+1, p.y+1);
+    Point below_right = Point(p.x+1, p.y-1);
+
+    double phix = -phi.at<double>(left) + phi.at<double>(right);
+    double phiy = -phi.at<double>(below) + phi.at<double>(above);
+    double phixx = phi.at<double>(left) - 2*phi.at<double>(p) + phi.at<double>(right);
+    double phiyy = phi.at<double>(below) - 2*phi.at<double>(p) + phi.at<double>(above);
+    double phixy = -0.25*phi.at<double>(below_left) - 0.25*phi.at<double>(above_right)
+                    +0.25*phi.at<double>(below_right) +0.25*phi.at<double>(above_left);
+    double phix2 = pow(phix, 2);
+    double phiy2 = pow(phiy, 2);
+
+    return ((phix2*phiyy + phiy2*phixx - 2*phix*phiy*phixy) /
+            pow(phix2 + phiy2 + eps, 1.5)) * pow((phix2 + phiy2), 0.5);
+}
+
 //
 // Computes a single iteration of the Lankton active contour algorithm.
 // Returns true if the contour converged, false otherwise.
 //
 bool activeContour(Mat src, Mat& phi) {
 
-    double lambda = 1.0;        // contour arc length weight
-    double radius = 10;         // radius of localized region to consider
+    double threshold_tolerance = 10e-16;  // stopping condition
 
-    double dt = 0.25;                   // artificial time step t >= 0
-    double threshold_tolerance = 0.01;  // stopping condition
+    int radius = 10;             // radius of localized region to consider
+    double lambda = 1.0;         // weight of curvature energy
+    double eps = 1.0;
 
-    int u0 = 0;
-    double phi_n, phi_n_plus_1 = 0.0;
-    double delta = 0.0;
-    double total_energy;
-    Point p;
+    // get the curves narrow band
+    vector<Point> border_points = getBorderPoints(phi);
 
+    double total_energy = 0.0;
     double phi_diff = 0.0;
+    // compute local energies along border of contour
+    vector<Point> local_points;
+    double energy = 0.0;
+    double ux, vx = 0.0;
+    double max_image_energy = 0.0;
+    double image_energy;
+    double arc_energy;
+    vector<double> energies;
+    int I;
+    for (auto p: border_points) {
+        local_points = localSurroundingRegion(src, p, radius);
+        ux = localRegionAverage(src, phi, local_points, INSIDE);
+        vx = localRegionAverage(src, phi, local_points, OUTSIDE);
 
-    int B = 0;
-	int px_i, px_j;
-	int py_i, py_j;
-    // TODO: fix edge cases, currently not processing borders of image
-    for (x_i = 1; x_i < phi.rows-1; ++x_i) {
-        for (int x_j = 1; x_j < phi.cols-1; ++x_j) {
-            pointX = Point(x_j, x_i);                // current point
-            delta = diracDelta(phi_n, dt);           // dirac delta
-
-            // avoid doing unnecessary work, only consider border points
-            if ( delta > 0 ) {
-                vector<Point> B = localSurroundingRegion(src, pointX, radius);
-                // calculate contour energy
-                ux = 0.0;
-                uy = 0.0;
-                insideCount = 0;
-                outsideCount = 0;
-                for (auto y : B) {
-                    ux += heaviside(y) * src.at<uchar>(y.y, y.x);
-                    insideCount += heaviside(y, phi_n);
-
-                    vx += (1.0 - heaviside(y)) * src.at<uchar>(y.y, y.x);
-                    outsideCount += (1.0 - heaviside(y, phi_n));
-                }
-                ux = ux / insideCount;  // normalize by length to make average
-                vx = vx / outsideCount;
-
-
-                // penalize energy based on arc length
-            }
-            u0 = src.at<uchar>(i, j);           // current point intensity
-            phi_n = phi.at<double>(i, j);        // current phi value
-
-            // Calculate arc length energy
-            // --------------------------------------
-            double phix, phiy, divr, divl, divu, divd = 0.0;
-            double pcurr = phi.at<double>(p.y, p.x);
-            phix = phi.at<double>(p.y, p.x+1) - pcurr;
-            phiy = (phi.at<double>(p.y+1, p.x) - phi.at<double>(p.y-1, p.x)) / 2;
-            divr = (1/sqrt(h + pow(phix, 2) + pow(phiy, 2)));
-            // ------------
-            phix = pcurr - phi.at<double>(p.y, p.x-1);
-            divl = (1/sqrt(h + pow(phix, 2) + pow(phiy, 2)));
-            // ------------
-            phix = (phi.at<double>(p.y, p.x+1) - phi.at<double>(p.y, p.x-1)) / 2;
-            phiy = phi.at<double>(p.y+1, p.x) - pcurr;
-            divd = (1/sqrt(h + pow(phix, 2) + pow(phiy, 2)));
-            // ------------
-            phiy = pcurr - phi.at<double>(p.y-1, p.x);
-            divu = (1/sqrt(h + pow(phix, 2) + pow(phiy, 2)));
-            // --------------------------------------
-
-            double dist1 = pow(u0 - c1, 2);
-            double dist2 = pow(u0 - c2, 2);
-
-            double div = (1 + dt*delta*mu*(divr + divl + divd + divu));
-            total_energy = (pcurr + dt*delta*(
-                        mu*(phi.at<double>(p.y,p.x+1)*divr +
-                            phi.at<double>(p.y,p.x-1)*divl +
-                            phi.at<double>(p.y+1,p.x)*divd +
-                            phi.at<double>(p.y-1,p.x)*divu)
-                        - v*area - lambda1*dist1 + lambda2*dist2)) / div;
-
-            phi_diff += abs(pcurr - total_energy);
-            phi.at<double>(i, j) = total_energy;
+        // compute local stats and get image-based forces
+        image_energy = 0.0;
+        for (auto py: local_points) {
+            // (I(y) - u_x)^2 - (I(y) - v_x)^2
+            I = src.at<uchar>(py);
+            image_energy += -(ux - vx) * (2*I - ux - vx);
         }
+
+        arc_energy = getCurvature(phi, p, eps);
+
+        energies.push_back(-image_energy + lambda*arc_energy);
     }
+
+    double max_energy = *max_element(begin(energies), end(energies));
+    for (int i = 0; i < border_points.size(); ++i ) {
+        Point p = border_points[i];
+        total_energy = energies[i] / max_energy;
+        cout << total_energy << endl;
+        phi_diff += abs(phi.at<double>(p) - total_energy);
+        phi.at<double>(p) = total_energy;
+    }
+
+    /*
+    double max_dphidt = 0.0;
+    vector<double> dphidt;
+    for (int i = 0; i < border_points.size(); ++i ) {
+        energy = image_energy[i]/max_image_energy + lambda*curvature[i];
+        cout << energy << endl;
+        dphidt.push_back(energy);
+        if (energy > max_dphidt) { max_dphidt = energy; }
+    }
+
+
+    // update phi and calculate total difference in energy
+    double dt = 0.45 / (max_dphidt + eps);
+    double total_energy = 0.0;
+    double phi_diff = 0.0;
+    for (int i = 0; i < border_points.size(); ++i ) {
+        Point p = border_points[i];
+        //total_energy = phi.at<double>(p) + dt*dphidt[i];
+        total_energy = image_energy[i] + lambda*curvature[i];
+        cout << total_energy << endl;
+        phi_diff += abs(phi.at<double>(p) - total_energy);
+        phi.at<double>(p) = total_energy;
+    }
+    */
 
     // normalize total difference in old vs new phi (describes the contour)
     phi_diff = phi_diff / (phi.rows * phi.cols);
     cout << "difference: " << phi_diff << endl;
 
-    // TODO: optionally reinitialize phi
+    // optionally reinitialize phi
 
     return (phi_diff < threshold_tolerance);
 }

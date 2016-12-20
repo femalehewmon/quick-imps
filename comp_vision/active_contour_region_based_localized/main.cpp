@@ -18,7 +18,7 @@
 // custom libraries
 #include "utils.hpp"
 #include "characterization.hpp"
-#include "chan_vese_active_contour.hpp"
+#include "lankton_active_contour.hpp"
 
 using namespace cv;
 using namespace std;

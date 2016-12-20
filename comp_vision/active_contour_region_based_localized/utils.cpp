@@ -36,6 +36,10 @@ Point farthestPoint(Point p, vector<Point> ps) {
     return ps[i];
 }
 
+bool inBounds (Mat image, Point p) {
+    return p.x >= 0 && p.y >= 0 && p.x < image.cols && p.y < image.rows;
+}
+
 double distanceBetweenPoints(Point a, Point b) {
     return sqrt(pow(b.x - a.x, 2) + pow(b.y - a.y, 2));
 }

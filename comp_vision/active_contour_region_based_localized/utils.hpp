@@ -24,6 +24,7 @@ vector<Point> loadPointsFromFile(string filename);
 void drawVector(Mat& dst, vector<Point> points);
 
 Point farthestPoint(Point p, vector<Point> ps);
+bool inBounds (Mat image, Point p);
 double distanceBetweenPoints(Point a, Point b);
 vector<double> distanceBetweenPoints(vector<Point> points);
 vector<double> distanceBetweenPoints(vector<Point> points, Point ref_point);
