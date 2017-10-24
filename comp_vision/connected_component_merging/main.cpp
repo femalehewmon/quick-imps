@@ -27,6 +27,7 @@ using namespace std;
 vector<string> filesInFolder(string& dirpath);
 void mergeHistory(vector<Mat> history, Mat& dst);
 bool inBounds(Rect r1, Rect r2, int dist=0);
+Rect mergeRects(Rect r1, Rect r2);
 
 vector<string> filesInFolder(string& dirpath) {
     dirpath.append("/*");
@@ -67,19 +68,37 @@ void mergeHistory(vector<Mat> history, Mat& dst) {
     }
 }
 
+void combineHistory(Mat& curr, vector<Mat> history, Mat& dst) {
+    dst = Mat::zeros(curr.size(), CV_8UC1);
+
+    Mat diff;
+    for ( int i = 0; i < history.size(); ++i ) {
+        subtract(history[i], curr, diff);
+        cvtColor(diff, diff, CV_BGR2GRAY);
+        threshold(diff, diff, 25, 255, 0);
+        diff.copyTo(dst, diff);
+    }
+}
+
 bool inBounds(Rect r1, Rect r2, int dist) {
-    return ( r2.x < (r1.x + r1.w + dist) && (r2.x + r2.w) > (r1.x - dist) &&
-            r2.y > (r1.y + r1.h + dist) && (r2.y + r2.h) < (r1.y - dist) );
+    return ((r2.x < (r1.x + r1.width + dist) && (r2.x + r2.width) > (r1.x - dist)) &&
+            (r2.y < (r1.y + r1.height + dist) && (r2.y + r2.height) > (r1.y - dist)) );
 }
 
 Rect mergeRects(Rect r1, Rect r2) {
     int x = r1.x < r2.x ? r1.x : r2.x;
     int y = r1.y < r2.y ? r1.y : r2.y;
-    int w = r1.x + r1.w > r2.x + r2.w ? (r1.x + r1.w - x) : (r2.x + r2.w - x);
-    int h = r1.y + r1.h > r2.y + r2.h ? (r1.y + r1.h - y) : (r2.y + r2.h - y);
+    int w = r1.x + r1.width > r2.x + r2.width ? (r1.x + r1.width - x) : (r2.x + r2.width - x);
+    int h = r1.y + r1.height > r2.y + r2.height ? (r1.y + r1.height - y) : (r2.y + r2.height - y);
     Rect merged = Rect(x, y, w, h);
     return merged;
 }
+
+struct RectCompare {
+    bool operator() (const Rect& r1, const Rect& r2) const {
+        return (r1.x < r2.x && r1.y < r2.y);
+    }
+};
 
 int main(int argc, char** argv)
 {
@@ -95,11 +114,11 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    int N = 5;                  // number of frames to stores
-    vector<Mat> history;         // stores the previous n frames
+    int N = 20;                  // number of frames to store
+    vector<Mat> history;         // stores the previous N frames
 
     Mat morph_element = getStructuringElement(MORPH_ELLIPSE, Size(5, 5));
-    Mat orig, background, buffer, output;
+    Mat orig, background, buffer, output, display;
 
     // process all video frames
     for ( int i = 0; i < img_files.size(); ++i ) {
@@ -108,11 +127,14 @@ int main(int argc, char** argv)
             cout << "No image data" <<  endl;
             return -1;
         }
+        display = Mat::zeros(orig.size(), orig.type());
+        buffer = Mat::zeros(orig.size(), orig.type());
 
         if ( !background.empty() ) {
-            subtract(background, orig, buffer);
-            cvtColor(buffer, buffer, CV_BGR2GRAY);
-            threshold(buffer, buffer, 25, 255, 0);
+            //subtract(background, orig, buffer);
+            //cvtColor(buffer, buffer, CV_BGR2GRAY);
+            //threshold(buffer, buffer, 25, 255, 0);
+            combineHistory(orig, history, buffer);
 
             // try to merge nearby areas with morphology
             morphologyEx(buffer, buffer, MORPH_CLOSE, morph_element);
@@ -122,7 +144,7 @@ int main(int argc, char** argv)
                     buffer, labels, stats, centroids);
 
             int close_to_label = 0;
-            map<Rect, vector<int> > close_to_connected;
+            map<Rect, vector<int>, RectCompare> close_to_connected;
             for ( int j = 1; j < n; ++j ) {
                 if ( stats.at<int>(j, CC_STAT_AREA) > 100 ) {
                     // Isolate the labeled region
@@ -132,41 +154,69 @@ int main(int argc, char** argv)
                     // Create bounding box of labeled area
                     Rect rect = boundingRect(buffer);
 
+                    vector<int> connected;
                     // See if bounding box falls within bounds of existing
                     // bounding box. If it does, merge the regions. Otherwise,
                     // add new bounding box to list.
+                    /*
                     vector<Rect> merge;
                     for ( auto const& box : close_to_connected ) {
-                        if ( inBounds(box, rect) ) {
-                            merge.push_back(box);
+                        if ( inBounds(box.first, rect) ) {
+                            merge.push_back(box.first);
                         }
                     }
 
-                    vector<int> connected;
-                    if ( merge.size() > 0 ) {
-                        for ( int k = 0; k < merge.size(); ++k ) {
-                            // add overlapping box labels to new entry
-                            connected.insert(connected.end(),
-                                             merge[k].begin(), merge[k].end());
-                            // remove overlapping box from final list
-                            close_to_connected.erase(merge[k]);
-                            // merge overlapping boxes and add to new entry
-                            rect = mergeRects(rect, merge[k]);
+                    while ( merge.size() > 0 ) {
+                        if ( merge.size() > 0 ) {
+                            for ( int k = 0; k < merge.size(); ++k ) {
+                                // add overlapping box labels to new entry
+                                connected.insert(connected.end(),
+                                             close_to_connected[merge[k]].begin(),
+                                             close_to_connected[merge[k]].end());
+                                // remove overlapping box from final list
+                                close_to_connected.erase(merge[k]);
+                                // merge overlapping boxes and add to new entry
+                                rect = mergeRects(rect, merge[k]);
+                            }
                         }
-                    } else {
+
+                        merge.clear();
+                        for ( auto const& box : close_to_connected ) {
+                            if ( inBounds(box.first, rect) ) {
+                                merge.push_back(box.first);
+                            }
+                        }
+                    }
+
+                    */
+                    // if no overlapping boxes found, create new list
+                    if ( connected.size() == 0 ) {
                         connected.push_back(j);
                     }
+
+                    // add final rect to list of final bounding boxes
                     close_to_connected[rect] = connected;
                 }
             }
 
-            //Point p1(rect.x, rect.y);
-            //Point p2(rect.x+rect.width, rect.y+rect.height);
-            //rectangle(output, p1, p2, 255, 1);
+            // Draw final bounding boxes
+            /*
+            for ( auto const& box : close_to_connected ) {
+                Rect rect = box.first;
+                Point p1(rect.x, rect.y);
+                Point p2(rect.x+rect.width, rect.y+rect.height);
+                rectangle(output, p1, p2, 255, 1);
+            }
+            */
 
             // show output frame
-            imshow("Output", output);
-            output = Scalar(5);
+            cvtColor(output, buffer, CV_GRAY2BGR);
+            addWeighted(orig, 0.5, buffer, 1.0, 0, display);
+
+            imshow("Output", buffer);
+            //output = Scalar(0);
+            //display = Scalar(0);
+            //buffer = Scalar(0);
 
             // if ESC key pressed, exit program
             if (waitKey(30) == 27) {
