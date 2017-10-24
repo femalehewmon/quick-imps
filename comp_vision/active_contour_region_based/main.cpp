@@ -41,7 +41,7 @@ void drawActiveContour(Mat& dst, Mat phi) {
     findContours(edges, contours, hierarchy,
                         CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
     for( int i = 0; i< contours.size(); i++ ) {
-        drawContours(dst, contours, i, Scalar(0, 0, 255), 2, 8, hierarchy, 0);
+        drawContours(dst, contours, i, Scalar(0, 0, 255), 1, 8, hierarchy, 0);
     }
     /*
     vector<Point> points = foreground<uchar>(contourMask);
@@ -86,13 +86,13 @@ int main(int argc, char** argv)
     // show initial visualization, prompt user to begin segmentation
     Mat vis = composite.clone();
     drawActiveContour(vis, phi);
-    drawMessage(vis, "Waiting to start... press any key");
+    //drawMessage(vis, "Waiting to start... press any key");
     imwrite("start.png", vis);
     imshow("Output", vis);
     waitKey(0);
 
     // run active contour algorithm and visualize progress
-    int it_max = 200; // cut-off point if algorithm does not converge
+    int it_max = 500; // cut-off point if algorithm does not converge
     int it_count = 0;
     while (it_count < it_max && !activeContour(img, phi)) {
         // increase iteration count
@@ -102,7 +102,7 @@ int main(int argc, char** argv)
         // visualize active contour iteration
         vis = composite.clone();
         drawActiveContour(vis, phi);
-        drawMessage(vis, "iteration: " + to_string(it_count));
+        //drawMessage(vis, "iteration: " + to_string(it_count));
         if (it_count == 25) {
             imwrite("mid1.png", vis);
         } else if (it_count == 50) {

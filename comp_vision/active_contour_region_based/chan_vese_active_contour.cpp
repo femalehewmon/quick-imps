@@ -19,11 +19,13 @@ void initializePhiCheckerboard(Mat& phi) {
 
 // assign circle pattern
 void initializePhiCircle(Mat& phi, int width, int height) {
-    int w = floor(width/2) - 50;
-    int h = floor(height/2) - 50;
+    int offset = 50;
+    int w = floor(width/2) - offset;
+    int h = floor(height/2) - offset;
     for ( int i = 0; i < phi.rows; ++i ) {
         for ( int j = 0; j < phi.cols; ++j ) {
-            phi.at<double>(i, j) = -sqrt(pow(j-w-50, 2) + pow(i-h-50, 2)) + min(w, h);
+            phi.at<double>(i, j) =
+                -sqrt(pow(j-w-offset, 2) + pow(i-h-offset, 2)) + min(w, h);
         }
     }
 }
@@ -60,7 +62,7 @@ double diracDelta (double phi_n, double dt) {
 bool activeContour(Mat src, Mat& phi) {
 
     double mu = 1.0;        // length weight
-    double v = 0.5;         // area weight, typically 0 (nu)
+    double v = 0.0;         // area weight, typically 0 (nu)
     double lambda1 = 1.0;   // c1 weight (average intensity inside contour)
     double lambda2 = 1.0;   // c2 weight (average intensity outside contour)
 

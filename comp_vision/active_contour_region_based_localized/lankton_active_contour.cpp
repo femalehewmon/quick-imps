@@ -118,6 +118,7 @@ double getCurvature(Mat phi, Point p, double eps) {
     double phix2 = pow(phix, 2);
     double phiy2 = pow(phiy, 2);
 
+    //cout << phix << " " << phiy << " " << phixx << " " << phiyy << " " << phixy << " " << phix2 << " " << phiy2 << endl;
     return ((phix2*phiyy + phiy2*phixx - 2*phix*phiy*phixy) /
             pow(phix2 + phiy2 + eps, 1.5)) * pow((phix2 + phiy2), 0.5);
 }
@@ -131,6 +132,7 @@ bool activeContour(Mat src, Mat& phi) {
     double threshold_tolerance = 10e-16;  // stopping condition
 
     int radius = 10;             // radius of localized region to consider
+    double alpha = 0.0;          // weight of local image stats energy
     double lambda = 1.0;         // weight of curvature energy
     double eps = 1.0;
 
@@ -141,12 +143,11 @@ bool activeContour(Mat src, Mat& phi) {
     double phi_diff = 0.0;
     // compute local energies along border of contour
     vector<Point> local_points;
-    double energy = 0.0;
+    vector<double> image_energy;
+    vector<double> curve_energy;
+
+    double local_image_energy = 0.0;
     double ux, vx = 0.0;
-    double max_image_energy = 0.0;
-    double image_energy;
-    double arc_energy;
-    vector<double> energies;
     int I;
     for (auto p: border_points) {
         local_points = localSurroundingRegion(src, p, radius);
@@ -154,18 +155,18 @@ bool activeContour(Mat src, Mat& phi) {
         vx = localRegionAverage(src, phi, local_points, OUTSIDE);
 
         // compute local stats and get image-based forces
-        image_energy = 0.0;
+        local_image_energy = 0.0;
         for (auto py: local_points) {
             // (I(y) - u_x)^2 - (I(y) - v_x)^2
             I = src.at<uchar>(py);
-            image_energy += -(ux - vx) * (2*I - ux - vx);
+            local_image_energy += -(ux - vx) * (2*I - ux - vx);
         }
+        image_energy.push_back(local_image_energy);
 
-        arc_energy = getCurvature(phi, p, eps);
-
-        energies.push_back(-image_energy + lambda*arc_energy);
+        curve_energy.push_back(getCurvature(phi, p, eps));
     }
 
+    /*
     double max_energy = *max_element(begin(energies), end(energies));
     for (int i = 0; i < border_points.size(); ++i ) {
         Point p = border_points[i];
@@ -174,31 +175,33 @@ bool activeContour(Mat src, Mat& phi) {
         phi_diff += abs(phi.at<double>(p) - total_energy);
         phi.at<double>(p) = total_energy;
     }
+    */
 
-    /*
-    double max_dphidt = 0.0;
     vector<double> dphidt;
+
+    double energy = 0.0;
+    double max_image_energy = *max_element(image_energy.begin(), image_energy.end());
+    double max_curve_energy = *max_element(curve_energy.begin(), curve_energy.end());
+    max_image_energy = 1.0;
+    //max_curve_energy = 1.0;
     for (int i = 0; i < border_points.size(); ++i ) {
-        energy = image_energy[i]/max_image_energy + lambda*curvature[i];
-        cout << energy << endl;
+        energy = alpha*(image_energy[i]/max_image_energy)
+                + lambda*(curve_energy[i]/max_curve_energy);
+        cout << curve_energy[i] << " " << energy << endl;
         dphidt.push_back(energy);
-        if (energy > max_dphidt) { max_dphidt = energy; }
     }
 
 
+    double max_dphidt = *max_element(dphidt.begin(), dphidt.end());
     // update phi and calculate total difference in energy
     double dt = 0.45 / (max_dphidt + eps);
-    double total_energy = 0.0;
-    double phi_diff = 0.0;
     for (int i = 0; i < border_points.size(); ++i ) {
         Point p = border_points[i];
-        //total_energy = phi.at<double>(p) + dt*dphidt[i];
-        total_energy = image_energy[i] + lambda*curvature[i];
-        cout << total_energy << endl;
+        total_energy = phi.at<double>(p) + (dphidt[i]);//dt*dphidt[i];
+        //cout << "total energy " << total_energy << endl;
         phi_diff += abs(phi.at<double>(p) - total_energy);
         phi.at<double>(p) = total_energy;
     }
-    */
 
     // normalize total difference in old vs new phi (describes the contour)
     phi_diff = phi_diff / (phi.rows * phi.cols);
