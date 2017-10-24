@@ -1,15 +1,42 @@
+#include <boost/filesystem.hpp>
 #include "utils.hpp"
 
 vector<Point> loadPointsFromFile(string filename) {
     vector<Point> points;
 
-    ifstream f;
-    f.open(filename);
-    int x, y;
-    while (f >> x >> y) {
-        // create new point and add as result
-        Point datapoint = Point(x, y);
-        points.push_back(datapoint);
+    string extension = boost::filesystem::extension(filename);
+    if ( extension == ".txt") {
+        // list of points
+        ifstream f;
+        f.open(filename);
+        int x, y;
+        while (f >> x >> y) {
+            // create new point and add as result
+            Point datapoint = Point(x, y);
+            points.push_back(datapoint);
+        }
+    } else {
+        // assume binary image with desired region in white
+		Mat gray = imread(filename, CV_LOAD_IMAGE_GRAYSCALE);
+		Mat canny_output;
+		vector<vector<Point> > contours;
+		vector<Vec4i> hierarchy;
+
+		Canny(gray, canny_output, 100, 255);
+		findContours(canny_output, contours, hierarchy,
+						CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
+        // reduce number of contour points
+        int numPoints = 40;// (int)(contours[0].size() * 0.15);
+        int save = 0;
+        for (auto point : contours[0]) {
+            if (save == 0) {
+                points.push_back(point);
+            }
+            ++save;
+            save = save % numPoints;
+        }
+        cout << "Num points: " << numPoints << endl;
+        cout << "Points saved: " << points.size() << endl;
     }
 
     return points;
